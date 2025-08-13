@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "text": "Tarea guardada correctamente",
+    "completed": false,
+    "createdAt": "2025-08-13T00:39:36.126Z"
+  },
+  {
+    "id": 2,
+    "text": "Prueba final",
+    "completed": false,
+    "createdAt": "2025-08-13T00:40:17.830Z"
+  },
+  {
+    "id": 3,
+    "text": "Prueba final",
+    "completed": false,
+    "createdAt": "2025-08-13T00:40:32.217Z"
+  },
+  {
+    "id": 4,
+    "text": "Prueba final",
+    "completed": false,
+    "createdAt": "2025-08-13T00:40:36.585Z"
+  },
+  {
+    "id": 5,
+    "text": "Tarea desde API",
+    "completed": false,
+    "createdAt": "2025-08-13T00:42:20.618Z"
+  }
+]
