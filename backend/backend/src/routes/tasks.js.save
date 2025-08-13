@@ -1,0 +1,114 @@
+// src/routes/tasks.js
+// CRUD de tareas conectado a Supabase
+const express = require('express');
+const supabase = require('./supabaseClient');
+
+const router = express.Router();
+
+// GET /api/tasks - Obtener todas las tareas
+router.get('/', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error('❌ Error al obtener tareas:', err.message);
+    res.status(500).json({ error: 'No se pudieron cargar las tareas' });
+  }
+});
+
+// POST /api/tasks - Crear una nueva tarea
+router.post('/', async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    // Validar que el texto exista y no esté vacío
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'El campo "text" es requerido y no puede estar vacío' });
+    }
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([{ text: text.trim(), completed: false }]);
+
+    if (error) throw error;
+
+    // Devuelve la tarea creada
+    res.status(201).json(data[0]);
+  } catch (err) {
+    console.error('❌ Error al crear tarea:', err.message);
+    res.status(500).json({ error: 'No se pudo crear la tarea' });
+  }
+});
+
+// PUT /api/tasks/:id - Actualizar tarea (completar o editar texto)
+router.put('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+
+    const { completed, text } = req.body;
+    const updates = {};
+
+    if (completed !== undefined) updates.completed = completed;
+    if (text && typeof text === 'string') updates.text = text.trim();
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) throw error;
+    if (data.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+
+    res.json(data[0]);
+  } catch (err) {
+    console.error('❌ Error al actualizar tarea:', err.message);
+    res.status(500).json({ error: 'No se pudo actualizar la tarea' });
+  }
+});
+
+// DELETE /api/tasks/:id - Eliminar una tarea
+router.delete('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
+
+    // Primero obtenemos la tarea para devolverla en la respuesta
+    const { data: existingTask, error: fetchError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingTask) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+
+    // Eliminamos la tarea
+    const { data, error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    res.json({ message: 'Tarea eliminada', task: existingTask });
+  } catch (err) {
+    console.error('❌ Error al eliminar tarea:', err.message);
+    res.status(500).json({ error: 'No se pudo eliminar la tarea' });
+  }
+});
+
+module.expo
