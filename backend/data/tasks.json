@@ -28,5 +28,11 @@
     "text": "Tarea desde API",
     "completed": false,
     "createdAt": "2025-08-13T00:42:20.618Z"
+  },
+  {
+    "id": 6,
+    "text": "Hacer proyecto de redes",
+    "completed": false,
+    "createdAt": "2025-08-13T01:02:30.873Z"
   }
 ]

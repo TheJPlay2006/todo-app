@@ -1,105 +1,118 @@
-// src/routes/tasks.js
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const supabase = require('../supabaseClient');
 
 const router = express.Router();
 
-// 🔥 Ruta absoluta: usa process.cwd() → apunta a la raíz del proyecto (donde está package.json)
-const dataPath = path.join(process.cwd(), 'data', 'tasks.json');
-
-console.log('📁 Ruta absoluta del archivo de tareas:', dataPath);
-
-const readTasks = () => {
+// GET /api/tasks - Obtener todas las tareas
+router.get('/', async (req, res) => {
   try {
-    // Si no existe, créalo
-    if (!fs.existsSync(dataPath)) {
-      console.log('⚠️  data/tasks.json no existe. Creando archivo vacío...');
-      const dir = path.dirname(dataPath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(dataPath, '[]', 'utf8');
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('id');
+
+    if (error) {
+      console.error('❌ Error Supabase:', error);
+      return res.status(500).json({ error: 'No se pudieron cargar las tareas' });
     }
-    const data = fs.readFileSync(dataPath, 'utf8');
-    return JSON.parse(data);
-  } catch (err) {
-    console.error('❌ Error al leer tasks.json:', err.message);
-    return [];
-  }
-};
 
-const writeTasks = (data) => {
-  try {
-    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), 'utf8');
+    res.json(data);
   } catch (err) {
-    console.error('❌ Error al escribir tasks.json:', err.message);
-    throw err;
-  }
-};
-
-// GET /api/tasks - Listar tareas
-router.get('/', (req, res) => {
-  try {
-    const tasks = readTasks();
-    res.json(tasks);
-  } catch (err) {
-    res.status(500).json({ error: 'No se pudieron leer las tareas' });
+    console.error('❌ Error al obtener tareas:', err.message);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
 // POST /api/tasks - Crear tarea
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const tasks = readTasks();
-    const text = req.body.text?.trim();
-    if (!text) {
-      return res.status(400).json({ error: 'El texto de la tarea es requerido' });
+    const { text } = req.body;
+
+    // Validar entrada
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      console.error('❌ Error: Texto inválido');
+      return res.status(400).json({
+        error: 'Campo "text" es requerido y no puede estar vacío'
+      });
     }
-    const newTask = {
-      id: tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1,
-      text,
-      completed: false,
-      createdAt: new Date().toISOString()
-    };
-    tasks.push(newTask);
-    writeTasks(tasks);
-    res.status(201).json(newTask);
+
+    console.log('✅ Texto válido:', text.trim());
+
+    // Insertar en Supabase
+    console.log('ℹ️ Intentando insertar en Supabase...');
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([{ text: text.trim(), completed: false }])
+      .select();
+
+    if (error) {
+      console.error('❌ Error en Supabase:', error.message);
+      return res.status(500).json({
+        error: 'No se pudo crear la tarea',
+        details: error.message
+      });
+    }
+
+    if (!data || data.length === 0) {
+      console.error('❌ Error: Supabase devolvió datos nulos');
+      return res.status(500).json({
+        error: 'Error al guardar la tarea',
+        details: 'Supabase devolvió datos nulos'
+      });
+    }
+
+    console.log('✅ Tarea creada:', data);
+    res.status(201).json(data[0]);
   } catch (err) {
-    res.status(500).json({ error: 'No se pudo guardar la tarea: ' + err.message });
+    console.error('❌ Error en el servidor:', err.message);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      details: err.message
+    });
   }
 });
 
-// PUT /api/tasks/:id - Actualizar (completar o editar)
-router.put('/:id', (req, res) => {
+// PUT /api/tasks/:id - Actualizar tarea
+router.put('/:id', async (req, res) => {
   try {
-    const tasks = readTasks();
     const id = parseInt(req.params.id);
-    const task = tasks.find(t => t.id === id);
-    if (!task) {
-      return res.status(404).json({ error: 'Tarea no encontrada' });
-    }
-    if (req.body.completed !== undefined) task.completed = req.body.completed;
-    if (req.body.text) task.text = req.body.text.trim();
-    writeTasks(tasks);
-    res.json(task);
+    const { completed, text } = req.body;
+    const updates = {};
+    if (completed !== undefined) updates.completed = completed;
+    if (text) updates.text = text.trim();
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) throw error;
+    if (data.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
+
+    res.json(data[0]);
   } catch (err) {
-    res.status(500).json({ error: 'No se pudo actualizar la tarea: ' + err.message });
+    console.error('❌ Error al actualizar tarea:', err.message);
+    res.status(500).json({ error: 'No se pudo actualizar' });
   }
 });
 
-// DELETE /api/tasks/:id - Eliminar
-router.delete('/:id', (req, res) => {
+// DELETE /api/tasks/:id - Eliminar tarea
+router.delete('/:id', async (req, res) => {
   try {
-    const tasks = readTasks();
     const id = parseInt(req.params.id);
-    const taskIndex = tasks.findIndex(t => t.id === id);
-    if (taskIndex === -1) {
-      return res.status(404).json({ error: 'Tarea no encontrada' });
-    }
-    const deletedTask = tasks.splice(taskIndex, 1);
-    writeTasks(tasks);
-    res.json({ message: 'Tarea eliminada', task: deletedTask[0] });
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    if (data.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
+
+    res.json({ message: 'Tarea eliminada', task: data[0] });
   } catch (err) {
-    res.status(500).json({ error: 'No se pudo eliminar la tarea: ' + err.message });
+    console.error('❌ Error al eliminar tarea:', err.message);
+    res.status(500).json({ error: 'No se pudo eliminar' });
   }
 });
 

@@ -1,4 +1,5 @@
-// src/server.js
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 
@@ -14,16 +15,11 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'API funcionando!' });
 });
 
-// Ruta para tareas
+// Rutas de tareas
 const tasksRouter = require('./routes/tasks');
 app.use('/api/tasks', tasksRouter);
 
-// Inicia el servidor en 0.0.0.0 para mayor compatibilidad
+// Inicia el servidor
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
-});
-
-// Mensaje de advertencia si hay error
-app.on('error', (err) => {
-  console.error('❌ Error del servidor:', err.message);
 });
